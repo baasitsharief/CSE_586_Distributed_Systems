@@ -1,0 +1,31 @@
+import React, { Component } from "react";
+// import {Link} from 'react-router-dom'
+import styled from "styled-components";
+
+import Logo from "./Logo";
+import Links from "./Links";
+
+const Container = styled.div.attrs({
+  className: "container",
+})``;
+
+const Nav = styled.nav.attrs({
+  className: "navbar navbar-expand-lg navbar-dark bg-dark",
+})`
+  margin-bottom: 20 px;
+`;
+
+class NavBar extends Component {
+  render() {
+    return (
+      <Container>
+        <Nav style={{ width: "100%" }}>
+          <Logo />
+          <Links />
+        </Nav>
+      </Container>
+    );
+  }
+}
+
+export default NavBar;
