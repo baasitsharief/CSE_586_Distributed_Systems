@@ -1,0 +1,24 @@
+{
+  "name": "ds_phase1",
+  "version": "1.0.0",
+  "description": "basic CRUD operations",
+  "main": "index.js",
+  "scripts": {
+    "start": "node server.js",
+    "server": "nodemon server.js"
+  },
+  "keywords": [],
+  "author": "Baasit Sharief, Shubhankar Nandakumar",
+  "license": "MIT",
+  "dependencies": {
+    "body-parser": "^1.19.2",
+    "concurrently": "^7.0.0",
+    "cors": "^2.8.5",
+    "express": "^4.17.2",
+    "mongoose": "^6.2.1",
+    "reactjs": "^1.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.15"
+  }
+}
