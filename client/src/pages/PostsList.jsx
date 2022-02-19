@@ -1,11 +1,8 @@
 import React, { Component } from "react";
-// import ReactTable from "react-table";
 import { DataGrid } from "@mui/x-data-grid";
 import api from "../Api.js";
 
 import styled from "styled-components";
-
-// import "react-table/react-table.css";
 
 const Wrapper = styled.div`
   padding: 0 40px 40px 40px;
@@ -66,7 +63,6 @@ class PostsList extends Component {
     this.setState({ isLoading: true });
 
     await api.getAllPosts().then((posts) => {
-      console.log(posts);
       this.setState({
         posts: posts.data,
         isLoading: false,
@@ -76,50 +72,24 @@ class PostsList extends Component {
 
   render() {
     const { posts, isLoading } = this.state;
-    console.log("TCL: PostsList -> render -> posts", posts);
+    console.log("PostsList -> render -> posts", posts);
 
     const columns = [
-      //   {
-      //     headerName: "ID",
-      //     field: "id",
-      //     // filterable: true,
-      //   },
       {
         headerName: "Title",
         field: "title",
-        // filterable: true,
+        width: 200,
       },
       {
         headerName: "Author",
         field: "author",
-        // filterable: true,
+        width: 200,
       },
       {
         headerName: "Description",
         field: "description",
+        width: 400,
       },
-      //   {
-      //     headerName: "",
-      //     field: "",
-      //     Cell: function (props) {
-      //       return (
-      //         <span>
-      //           <DeletePost id={props.original._id} />
-      //         </span>
-      //       );
-      //     },
-      //   },
-      //   {
-      //     headerName: "",
-      //     field: "",
-      //     Cell: function (props) {
-      //       return (
-      //         <span>
-      //           <UpdatePost id={props.original._id} />
-      //         </span>
-      //       );
-      //     },
-      //   },
     ];
 
     let showTable = true;
@@ -127,18 +97,14 @@ class PostsList extends Component {
       showTable = false;
     }
 
-    // for (i = 0; i < posts.length; i++) {}
-
     return (
-      <Wrapper style={{ height: "650px", width: "100%" }}>
+      <Wrapper style={{ height: "800px", width: "100%" }}>
         {console.log(posts.data)}
         <DataGrid
           rows={posts.data}
           columns={columns}
-          //   getRowId={(row) => row._id}
-          // loading={isLoading}
           pageSize={5}
-          rowsPerPageOptions={[5]}
+          rowsPerPageOptions={[5, 10, 15, 20]}
           checkboxSelection
         />
       </Wrapper>

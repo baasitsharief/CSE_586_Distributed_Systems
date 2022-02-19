@@ -1,18 +1,18 @@
 version: "3"
 services:
   react-app:
-    image: react-test
+    image: react-app-image
     stdin_open: true
     ports:
       - "3000:3000"
     networks:
-      - mern-app
+      - ds-phase1
   api-server:
-    image: node-test
+    image: express-api-image
     ports:
       - "5000:5000"
     networks:
-      - mern-app
+      - ds-phase1
     depends_on:
       - mongo
   mongo:
@@ -20,11 +20,11 @@ services:
     ports:
       - "27017:27017"
     networks:
-      - mern-app
+      - ds-phase1
     volumes:
       - mongodata:/data/db
 networks:
-  mern-app:
+  ds-phase1:
     driver: bridge
 volumes:
   mongodata:

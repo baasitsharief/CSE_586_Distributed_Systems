@@ -103,9 +103,7 @@ deletePost = async (req, res) => {
     }
 
     return res.status(200).json({ status: true, data: post });
-  })
-    // .clone()
-    .catch((err) => console.log(err));
+  }).catch((err) => console.log(err));
 };
 
 getPosts = async (req, res) => {
@@ -133,7 +131,6 @@ getPosts = async (req, res) => {
 };
 
 getPostById = async (req, res) => {
-  // console.log(req.params.id);
   return await Post.findOne({ _id: req.params.id }, (err, post) => {
     if (err) {
       return res.status(400).json({
