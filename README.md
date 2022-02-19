@@ -20,6 +20,7 @@ https://localhost:3000/
 `
 
 For create post
+
 `
 https://localhost:3000/posts/create
 `
