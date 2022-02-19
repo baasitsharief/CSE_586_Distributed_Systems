@@ -7,9 +7,17 @@ From cmd/terminal
 
 `
 docker pull mongo
+`
+`
 cd server && docker build -t express-api-image .
+`
+`
 cd ../client && docker build -t react-app-image .
+`
+`
 cd ..
+`
+`
 docker-compose up
 `
 
