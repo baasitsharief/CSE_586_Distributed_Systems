@@ -1,4 +1,23 @@
+const axios = require("axios");
 const Post = require("../models/post-model");
+
+commitCreate = (res, post) => {
+  post
+    .save()
+    .then(() => {
+      return res.status(201).json({
+        status: true,
+        id: post._id,
+        message: "Post created!",
+      });
+    })
+    .catch((error) => {
+      return res.status(400).json({
+        error,
+        message: "Post not created",
+      });
+    });
+};
 
 createPost = (req, res) => {
   const body = req.body;
@@ -21,21 +40,28 @@ createPost = (req, res) => {
     });
   }
 
-  post
-    .save()
-    .then(() => {
-      return res.status(201).json({
-        status: true,
-        id: post._id,
-        message: "Post created!",
-      });
-    })
-    .catch((error) => {
-      return res.status(400).json({
-        error,
-        message: "Post not created",
-      });
-    });
+  var count = 0;
+
+  if (process.env.MASTER === "yes") {
+    for (var i = 1; i < 3; i++) {
+      axios
+        .post(`http://api-server-${i}:5000/api/post`, body)
+        .then(function (response) {
+          // console.log(response.status);
+          if (response.status == 201) count++;
+          // console.log(count);
+          if (count == 2) {
+            commitCreate(res, post);
+          }
+        })
+        .catch(function (error) {
+          // handle error
+          console.log(error);
+        });
+    }
+  } else {
+    commitCreate(res, post);
+  }
 };
 
 updatePost = async (req, res) => {

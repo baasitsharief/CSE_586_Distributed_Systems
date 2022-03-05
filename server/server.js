@@ -8,6 +8,8 @@ const postRouter = require("./routes/post-router");
 const app = express();
 const port = 5000;
 
+const isMaster = process.env.MASTER;
+
 app.use(cors());
 
 app.use(bodyParser.urlencoded({ extended: true }));

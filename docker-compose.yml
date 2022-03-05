@@ -6,26 +6,86 @@ services:
     ports:
       - "3000:3000"
     networks:
-      - ds-phase1
+      - servers-network
   api-server:
     image: express-api-image
     ports:
       - "5000:5000"
     networks:
-      - ds-phase1
+      - ds-app
+      - servers-network
     depends_on:
       - mongo
+    environment:
+      DB_HOST: mongo
+      DB_PORT: 27017
+      MASTER: "yes"
   mongo:
     image: mongo
     ports:
       - "27017:27017"
     networks:
-      - ds-phase1
+      - ds-app
+      - servers-network
     volumes:
       - mongodata:/data/db
+  api-server-1:
+    image: express-api-image
+    ports:
+      - "5001:5000"
+    networks:
+      - ds-app-1
+      - servers-network
+    depends_on:
+      - mongo-1
+    environment:
+      DB_HOST: mongo-1
+      DB_PORT: 27017
+      MASTER: "no"
+  mongo-1:
+    image: mongo
+    ports:
+      - "27018:27017"
+    networks:
+      - ds-app-1
+      - servers-network
+    volumes:
+      - mongodata-1:/data/db
+  api-server-2:
+    image: express-api-image
+    ports:
+      - "5002:5000"
+    networks:
+      - ds-app-2
+      - servers-network
+    depends_on:
+      - mongo-2
+    environment:
+      DB_HOST: mongo-2
+      DB_PORT: 27017
+      MASTER: "no"
+  mongo-2:
+    image: mongo
+    ports:
+      - "27019:27017"
+    networks:
+      - ds-app-2
+      - servers-network
+    volumes:
+      - mongodata-2:/data/db
 networks:
-  ds-phase1:
+  ds-app:
+    driver: bridge
+  ds-app-1:
+    driver: bridge
+  ds-app-2:
+    driver: bridge
+  servers-network:
     driver: bridge
 volumes:
   mongodata:
+    driver: local
+  mongodata-1:
+    driver: local
+  mongodata-2:
     driver: local
