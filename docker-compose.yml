@@ -1,6 +1,9 @@
 version: "3"
 services:
   react-app:
+    build:
+      context: ./client
+      dockerfile: ./client/Dockerfile
     image: react-app-image
     stdin_open: true
     ports:
@@ -8,6 +11,9 @@ services:
     networks:
       - servers-network
   api-server:
+    build:
+      context: ./server
+      dockerfile: ./server/Dockerfile
     image: express-api-image
     ports:
       - "5000:5000"
