@@ -3,7 +3,7 @@ services:
   react-app:
     build:
       context: ./client
-      dockerfile: ./client/Dockerfile
+      dockerfile: ./Dockerfile
     image: react-app-image
     stdin_open: true
     ports:
@@ -13,7 +13,7 @@ services:
   api-server:
     build:
       context: ./server
-      dockerfile: ./server/Dockerfile
+      dockerfile: ./Dockerfile
     image: express-api-image
     ports:
       - "5000:5000"
