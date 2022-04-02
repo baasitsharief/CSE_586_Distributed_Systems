@@ -26,6 +26,7 @@ services:
       DB_HOST: mongo
       DB_PORT: 27017
       MASTER: "yes"
+      NODE_ID: 1
   mongo:
     image: mongo
     ports:
@@ -48,6 +49,7 @@ services:
       DB_HOST: mongo-1
       DB_PORT: 27017
       MASTER: "no"
+      NODE_ID: 2
   mongo-1:
     image: mongo
     ports:
@@ -70,6 +72,7 @@ services:
       DB_HOST: mongo-2
       DB_PORT: 27017
       MASTER: "no"
+      NODE_ID: 3
   mongo-2:
     image: mongo
     ports:
