@@ -1,16 +1,16 @@
 version: "3"
 services:
-  react-app:
-    build:
-      context: ./client
-      dockerfile: ./Dockerfile
-    image: react-app-image
-    stdin_open: true
-    ports:
-      - "3000:3000"
-    networks:
-      - servers-network
-  api-server:
+  # react-app:
+  #   build:
+  #     context: ./client
+  #     dockerfile: ./Dockerfile
+  #   image: react-app-image
+  #   stdin_open: true
+  #   ports:
+  #     - "3000:3000"
+  #   networks:
+  #     - servers-network
+  api-server-0:
     build:
       context: ./server
       dockerfile: ./Dockerfile
@@ -26,7 +26,9 @@ services:
       DB_HOST: mongo
       DB_PORT: 27017
       MASTER: "yes"
-      NODE_ID: 1
+      NODE_ID: 0
+    volumes:
+      - mongodata:/home/node
   mongo:
     image: mongo
     ports:
@@ -49,7 +51,9 @@ services:
       DB_HOST: mongo-1
       DB_PORT: 27017
       MASTER: "no"
-      NODE_ID: 2
+      NODE_ID: 1
+    volumes:
+      - mongodata-1:/home/node
   mongo-1:
     image: mongo
     ports:
@@ -72,7 +76,9 @@ services:
       DB_HOST: mongo-2
       DB_PORT: 27017
       MASTER: "no"
-      NODE_ID: 3
+      NODE_ID: 2
+    volumes:
+      - mongodata-2:/home/node
   mongo-2:
     image: mongo
     ports:

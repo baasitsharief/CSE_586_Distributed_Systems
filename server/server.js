@@ -1,7 +1,13 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const cors = require("cors");
-const { heartbeat } = require("./controllers/raft-comm");
+const {
+  heartbeat,
+  requestVote,
+  initialize_logs,
+} = require("./controllers/raft-comm");
+
+const logsPath = "../home/node/logs.json";
 
 const worker = require("worker_threads");
 const dgram = require("dgram");
@@ -13,6 +19,8 @@ const app = express();
 const port = 5000;
 const udp_port = 4040;
 
+var logs = initialize_logs(logsPath);
+
 const udp_server = dgram.createSocket("udp4");
 
 const raft_states = [
@@ -23,19 +31,34 @@ const raft_states = [
 
 const node_id = process.env.NODE_ID;
 
+var term = 0;
+
 var state = 0;
+
 state = process.env.MASTER === "yes" ? 2 : 0;
 var timeout = parseInt((Math.random() / 2.0) * 1000); //in milliseconds
 
-console.log(timeout);
+// console.log(timeout);
 
 udp_server.on("error", (err) => {
   console.log(`udp server error:\n${err.stack}`);
-  server.close();
+  udp_server.close();
 });
 
 udp_server.on("message", (msg, rinfo) => {
-  console.log(`udp server got: ${msg}, my state: ${state}, my id: ${node_id}`);
+  // console.log(`udp server got: ${msg}, my state: ${state}, my id: ${node_id}`);
+  msg = JSON.parse(msg);
+
+  if (msg.type === 0) {
+    if (state === 1) {
+      state = 0;
+    }
+    appendEntries(msg, state, logs, logsPath);
+  }
+  if (msg.type === 1) {
+    let lastLog = logs[Object.keys(logs).length - 1];
+    // if(compareLogs(msg, lastLog))
+  }
 });
 
 udp_server.on("listening", () => {
@@ -63,4 +86,4 @@ app.use("/api", postRouter);
 
 app.listen(port, () => console.log(`Server running on ${port}`));
 
-setInterval(heartbeat, 10000, udp_server, state);
+setInterval(heartbeat, 10000, udp_server, state, term, logs, logsPath);
