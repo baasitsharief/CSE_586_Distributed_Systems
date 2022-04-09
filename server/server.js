@@ -135,7 +135,7 @@ udp_server.on("message", (msg, rinfo) => {
     }
     if (
       votesReceived == parseInt(num_nodes) &&
-      votesFor < parseInt(num_nodes / 2)
+      votesFor <= parseInt(num_nodes / 2)
     ) {
       console.log("No majority. Demoting to follower.");
       response = demoteToFollower(state, term);
@@ -146,19 +146,18 @@ udp_server.on("message", (msg, rinfo) => {
     } // startElection.reset();
   } else if (parseInt(msg.request) === 0) {
     // console.log(`my state ${state}, heartbeat from ${msg.leaderID}`);
-
+    startElection.reset();
     //hearbeat received
     if (Object.keys(votedFor).length > 0) {
       msg.votedFor = votedFor[Object.keys(votedFor) - 1];
     } else {
       msg.votedFor = "";
     }
-    startElection.reset();
     // console.log(`Leader found. Demoting ${process.env.NODE_ID} to follower.`);
     if (state !== 0 && term < msg.term && term > 1) {
       console.log("New Leader found. Demoting to follower.");
       response = demoteToFollower(state, term);
-    } else if (state !== 0 && term <= msg.term && term <= 1) {
+    } else if (state !== 0 && term <= msg.term) {
       console.log("New Leader found. Demoting to follower.");
       response = demoteToFollower(state, term);
     }

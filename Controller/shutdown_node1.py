@@ -16,7 +16,7 @@ port = 4040
 
 # Request
 msg['sender_name'] = sender
-msg['request'] = "LEADER_INFO"
+msg['request'] = "SHUTDOWN"
 print(f"Request Created : {msg}")
 
 # Socket Creation and Binding
@@ -30,4 +30,3 @@ try:
 except:
     #  socket.gaierror: [Errno -3] would be thrown if target IP container does not exist or exits, write your listener
     print(f"ERROR WHILE SENDING REQUEST ACROSS : {traceback.format_exc()}")
-
