@@ -96,14 +96,18 @@ udp_server.bind(udp_port);
 udp_server.on("message", (msg, rinfo) => {
   // console.log(`udp server got: ${msg}, my state: ${state}, my id: ${node_id}`);
   msg = JSON.parse(msg);
-  // console.log(`For node: ${process.env.NODE_ID},  msg: ${JSON.stringify(msg)}`);
+  // console.log(
+  //   `For node: ${process.env.NODE_ID},  msg: ${JSON.stringify(
+  //     msg
+  //   )}, timeout: ${timeout}`
+  // );
   if (parseInt(msg.request) === 2 && state === 1) {
     //Calculate Votes if candidate
     votesReceived = parseInt(votesReceived) + 1;
     if (msg.vote) {
       votesFor = parseInt(votesFor) + 1;
     }
-    if (votesFor > parseInt(num_nodes / 2) || num_nodes == 2) {
+    if (votesFor > parseInt(num_nodes / 2) + 1 || num_nodes == 2) {
       response = promoteToLeader(
         udp_server,
         state,
@@ -133,6 +137,7 @@ udp_server.on("message", (msg, rinfo) => {
       votesReceived == parseInt(num_nodes) &&
       votesFor < parseInt(num_nodes / 2)
     ) {
+      console.log("No majority. Demoting to follower.");
       response = demoteToFollower(state, term);
       state = response.state;
       term = response.term;
@@ -150,7 +155,10 @@ udp_server.on("message", (msg, rinfo) => {
     }
     startElection.reset();
     // console.log(`Leader found. Demoting ${process.env.NODE_ID} to follower.`);
-    if (state !== 0 && term <= msg.term) {
+    if (state !== 0 && term < msg.term && term > 1) {
+      console.log("New Leader found. Demoting to follower.");
+      response = demoteToFollower(state, term);
+    } else if (state !== 0 && term <= msg.term && term <= 1) {
       console.log("New Leader found. Demoting to follower.");
       response = demoteToFollower(state, term);
     }
@@ -161,7 +169,7 @@ udp_server.on("message", (msg, rinfo) => {
     clearInterval(heartbeat_timer);
     appendEntries(msg, state, timeout, logs, logsPath);
     logs = initialize_logs(logsPath);
-  } else if (parseInt(msg.request) === 1 && state != 2) {
+  } else if (parseInt(msg.request) === 1 && state !== 2) {
     //RequestVote received so send vote if not leader
     let vote = sendVote(udp_server, logs, msg);
     if (vote.votedFor != -1) {
@@ -209,7 +217,7 @@ udp_server.on("message", (msg, rinfo) => {
       } else if (state === 0) {
         startElection.stop();
       } else {
-        console.log("wtf that shouldn't be possible.");
+        console.log("That shouldn't be possible.");
       }
       let res = {
         request: "node_dead",
@@ -282,13 +290,3 @@ app.get("/", (req, res) => {
 app.use("/api", postRouter);
 
 app.listen(port, () => console.log(`Server running on ${port}`));
-
-// setInterval(
-//   heartbeat,
-//   config.TIME_PERIOD,
-//   udp_server,
-//   state,
-//   term,
-//   logs,
-//   logsPath
-// );
