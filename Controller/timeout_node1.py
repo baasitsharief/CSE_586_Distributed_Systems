@@ -16,7 +16,7 @@ port = 4040
 
 # Request
 msg['sender_name'] = sender
-msg['request'] = "CONVERT_FOLLOWER"
+msg['request'] = "TIMEOUT"
 print(f"Request Created : {msg}")
 
 # Socket Creation and Binding

@@ -53,7 +53,7 @@ var state = 0;
 
 var response = {};
 
-state = process.env.MASTER === "yes" ? 2 : 0;
+// state = process.env.MASTER === "yes" ? 2 : 0;
 var timeout =
   parseInt(config.TIME_PERIOD) +
   parseInt(Math.random() * parseInt(config.TIME_PERIOD)); //in milliseconds
