@@ -236,7 +236,7 @@ udp_server.on("message", (msg, rinfo) => {
       } else {
         console.log("That shouldn't be possible.");
       }
-      console.log("socket closed!");
+      // console.log("socket closed!");
       // udp_server.close();
     } catch (error) {
       console.log("socket already closed/unavailable");
