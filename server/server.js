@@ -209,15 +209,6 @@ udp_server.on("message", (msg, rinfo) => {
   } else if (msg.request === "SHUTDOWN") {
     try {
       console.log("Closing socket..");
-      if (state === 2) {
-        clearInterval(heartbeat_timer);
-      } else if (state === 1) {
-        startElection.stop();
-      } else if (state === 0) {
-        startElection.stop();
-      } else {
-        console.log("That shouldn't be possible.");
-      }
       let res = {
         request: "node_dead",
       };
@@ -236,6 +227,16 @@ udp_server.on("message", (msg, rinfo) => {
           }
         }
       }
+      if (state === 2) {
+        clearInterval(heartbeat_timer);
+      } else if (state === 1) {
+        startElection.stop();
+      } else if (state === 0) {
+        startElection.stop();
+      } else {
+        console.log("That shouldn't be possible.");
+      }
+      console.log("socket closed!");
       // udp_server.close();
     } catch (error) {
       console.log("socket already closed/unavailable");
