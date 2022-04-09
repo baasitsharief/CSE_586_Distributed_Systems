@@ -4,13 +4,15 @@ services:
   #   build:
   #     context: ./client
   #     dockerfile: ./Dockerfile
+
   #   image: react-app-image
   #   stdin_open: true
   #   ports:
   #     - "3000:3000"
   #   networks:
   #     - servers-network
-  api-server-0:
+  node1:
+    container_name: Node1
     build:
       context: ./server
       dockerfile: ./Dockerfile
@@ -26,7 +28,7 @@ services:
       DB_HOST: mongo
       DB_PORT: 27017
       MASTER: "yes"
-      NODE_ID: 0
+      NODE_ID: 1
     volumes:
       - mongodata:/home/node
   mongo:
@@ -38,7 +40,8 @@ services:
       - servers-network
     volumes:
       - mongodata:/data/db
-  api-server-1:
+  node2:
+    container_name: Node2
     image: express-api-image
     ports:
       - "5001:5000"
@@ -51,7 +54,7 @@ services:
       DB_HOST: mongo-1
       DB_PORT: 27017
       MASTER: "no"
-      NODE_ID: 1
+      NODE_ID: 2
     volumes:
       - mongodata-1:/home/node
   mongo-1:
@@ -63,7 +66,8 @@ services:
       - servers-network
     volumes:
       - mongodata-1:/data/db
-  api-server-2:
+  node3:
+    container_name: Node3
     image: express-api-image
     ports:
       - "5002:5000"
@@ -76,7 +80,7 @@ services:
       DB_HOST: mongo-2
       DB_PORT: 27017
       MASTER: "no"
-      NODE_ID: 2
+      NODE_ID: 3
     volumes:
       - mongodata-2:/home/node
   mongo-2:
@@ -88,12 +92,80 @@ services:
       - servers-network
     volumes:
       - mongodata-2:/data/db
+  node4:
+    container_name: Node4
+    image: express-api-image
+    ports:
+      - "5003:5000"
+    networks:
+      - ds-app-3
+      - servers-network
+    depends_on:
+      - mongo-3
+    environment:
+      DB_HOST: mongo-3
+      DB_PORT: 27017
+      MASTER: "no"
+      NODE_ID: 4
+    volumes:
+      - mongodata-3:/home/node
+  mongo-3:
+    image: mongo
+    ports:
+      - "27020:27017"
+    networks:
+      - ds-app-3
+      - servers-network
+    volumes:
+      - mongodata-3:/data/db
+  node5:
+    container_name: Node5
+    image: express-api-image
+    ports:
+      - "5004:5000"
+    networks:
+      - ds-app-4
+      - servers-network
+    depends_on:
+      - mongo-4
+    environment:
+      DB_HOST: mongo-4
+      DB_PORT: 27017
+      MASTER: "no"
+      NODE_ID: 5
+    volumes:
+      - mongodata-4:/home/node
+  mongo-4:
+    image: mongo
+    ports:
+      - "27021:27017"
+    networks:
+      - ds-app-4
+      - servers-network
+    volumes:
+      - mongodata-4:/data/db
+  controller:
+    container_name: Controller
+    build: Controller/.
+    stdin_open: true
+    depends_on:
+      - node1
+      - node2
+      - node3
+      - node4
+      - node5
+    networks:
+      - servers-network
 networks:
   ds-app:
     driver: bridge
   ds-app-1:
     driver: bridge
   ds-app-2:
+    driver: bridge
+  ds-app-3:
+    driver: bridge
+  ds-app-4:
     driver: bridge
   servers-network:
     driver: bridge
@@ -103,4 +175,8 @@ volumes:
   mongodata-1:
     driver: local
   mongodata-2:
+    driver: local
+  mongodata-3:
+    driver: local
+  mongodata-4:
     driver: local

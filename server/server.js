@@ -3,9 +3,17 @@ const bodyParser = require("body-parser");
 const cors = require("cors");
 const {
   heartbeat,
-  requestVote,
+  // requestVote,
   initialize_logs,
+  appendEntries,
+  sendVote,
+  // compareLogs,
+  promoteToCandidate,
+  demoteToFollower,
+  promoteToLeader,
+  Timer,
 } = require("./controllers/raft-comm");
+const config = require("./config");
 
 const logsPath = "../home/node/logs.json";
 
@@ -29,14 +37,26 @@ const raft_states = [
   2, //Master
 ];
 
-const node_id = process.env.NODE_ID;
+var num_nodes = config.NODES;
 
+var votedFor = [];
+// const node_id = process.env.NODE_ID;
 var term = 0;
+if (Object.keys(logs).length !== 0) {
+  if (typeof logs[Object.keys(logs).length - 1].term == "number") {
+    term = logs[Object.keys(logs).length - 1].term;
+    votedFor.push(logs[Object.keys(logs).length - 1].votedFor);
+  }
+}
 
 var state = 0;
 
+var response = {};
+
 state = process.env.MASTER === "yes" ? 2 : 0;
-var timeout = parseInt((Math.random() / 2.0) * 1000); //in milliseconds
+var timeout =
+  parseInt(config.TIME_PERIOD) +
+  parseInt(Math.random() * parseInt(config.TIME_PERIOD)); //in milliseconds
 
 // console.log(timeout);
 
@@ -45,21 +65,26 @@ udp_server.on("error", (err) => {
   udp_server.close();
 });
 
-udp_server.on("message", (msg, rinfo) => {
-  // console.log(`udp server got: ${msg}, my state: ${state}, my id: ${node_id}`);
-  msg = JSON.parse(msg);
+var votesFor = 1;
+var votesReceived = 1;
+var startElection = new Timer(() => {
+  if (state === 0) {
+    let res = promoteToCandidate(udp_server, logs, state, term);
+    state = res.state;
+    term = term + 1;
+  }
+}, timeout);
 
-  if (msg.type === 0) {
-    if (state === 1) {
-      state = 0;
-    }
-    appendEntries(msg, state, logs, logsPath);
-  }
-  if (msg.type === 1) {
-    let lastLog = logs[Object.keys(logs).length - 1];
-    // if(compareLogs(msg, lastLog))
-  }
-});
+var heartbeat_timer = setInterval(
+  heartbeat,
+  config.TIME_PERIOD,
+  udp_server,
+  state,
+  timeout,
+  term,
+  logs,
+  logsPath
+);
 
 udp_server.on("listening", () => {
   const address = udp_server.address();
@@ -67,6 +92,178 @@ udp_server.on("listening", () => {
 });
 
 udp_server.bind(udp_port);
+
+udp_server.on("message", (msg, rinfo) => {
+  // console.log(`udp server got: ${msg}, my state: ${state}, my id: ${node_id}`);
+  msg = JSON.parse(msg);
+  // console.log(`For node: ${process.env.NODE_ID},  msg: ${JSON.stringify(msg)}`);
+  if (parseInt(msg.request) === 2 && state === 1) {
+    //Calculate Votes if candidate
+    votesReceived = parseInt(votesReceived) + 1;
+    if (msg.vote) {
+      votesFor = parseInt(votesFor) + 1;
+    }
+    if (votesFor > parseInt(num_nodes / 2) || num_nodes == 2) {
+      response = promoteToLeader(
+        udp_server,
+        state,
+        timeout,
+        term,
+        logs,
+        logsPath
+      );
+      state = response.state;
+      term = response.term;
+      votesFor = 1;
+      votesReceived = 1;
+      clearInterval(heartbeat_timer);
+      heartbeat_timer = setInterval(
+        heartbeat,
+        config.TIME_PERIOD,
+        udp_server,
+        state,
+        timeout,
+        term,
+        logs,
+        logsPath
+      );
+      startElection.stop();
+    }
+    if (
+      votesReceived == parseInt(num_nodes) &&
+      votesFor < parseInt(num_nodes / 2)
+    ) {
+      response = demoteToFollower(state, term);
+      state = response.state;
+      term = response.term;
+      votesFor = 1;
+      votesReceived = 1;
+    } // startElection.reset();
+  } else if (parseInt(msg.request) === 0) {
+    // console.log(`my state ${state}, heartbeat from ${msg.leaderID}`);
+
+    //hearbeat received
+    if (Object.keys(votedFor).length > 0) {
+      msg.votedFor = votedFor[Object.keys(votedFor) - 1];
+    } else {
+      msg.votedFor = "";
+    }
+    startElection.reset();
+    // console.log(`Leader found. Demoting ${process.env.NODE_ID} to follower.`);
+    if (state !== 0 && term <= msg.term) {
+      console.log("New Leader found. Demoting to follower.");
+      response = demoteToFollower(state, term);
+    }
+    state = 0;
+    term = msg.term;
+    votesFor = 1;
+    votesReceived = 1;
+    clearInterval(heartbeat_timer);
+    appendEntries(msg, state, timeout, logs, logsPath);
+    logs = initialize_logs(logsPath);
+  } else if (parseInt(msg.request) === 1 && state != 2) {
+    //RequestVote received so send vote if not leader
+    let vote = sendVote(udp_server, logs, msg);
+    if (vote.votedFor != -1) {
+      votedFor.push(vote);
+      // console.log(vote);
+    }
+  } else if (msg.request === "CONVERT_FOLLOWER") {
+    if (state !== 0) {
+      console.log("Converting to follower...");
+      if (state === 2) {
+        clearInterval(heartbeat_timer);
+      }
+      console.log("Converted to follower.");
+    } else {
+      console.log("Already a follower.");
+    }
+    state = 0;
+    startElection.reset();
+  } else if (msg.request === "TIMEOUT") {
+    if (state !== 0) {
+      console.log("Converting and timing out...");
+      if (state === 2) {
+        startElection.reset();
+      }
+      state = 0;
+    }
+    console.log("Timing out..");
+    let res = promoteToCandidate(udp_server, logs, state, term);
+    state = res.state;
+    term = term + 1;
+    votesFor = 1;
+    votesReceived = 1;
+  } else if (msg.request === "LEADER_INFO") {
+    let res = {
+      LEADER: logs[Object.keys(logs).length - 1].leaderID,
+    };
+    console.log(res);
+  } else if (msg.request === "SHUTDOWN") {
+    try {
+      console.log("Closing socket..");
+      if (state === 2) {
+        clearInterval(heartbeat_timer);
+      } else if (state === 1) {
+        startElection.stop();
+      } else if (state === 0) {
+        startElection.stop();
+      } else {
+        console.log("wtf that shouldn't be possible.");
+      }
+      let res = {
+        request: "node_dead",
+      };
+      for (var i = 1; i <= config.NODES; i++) {
+        if (i != process.env.NODE_ID) {
+          try {
+            udp_server.send(JSON.stringify(res), 4040, `Node${i}`, () => {
+              num_nodes = num_nodes - 1;
+              if (num_nodes === 0) {
+                udp_server.close();
+                console.log("socket closed!");
+              }
+            });
+          } catch (error) {
+            console.log(`Node${i} is inactive`);
+          }
+        }
+      }
+      // udp_server.close();
+    } catch (error) {
+      console.log("socket already closed/unavailable");
+    }
+  } else if (msg.request === "node_dead") {
+    num_nodes = num_nodes - 1;
+    // console.log(`Nodes active: ${num_nodes}`);
+    if (num_nodes === 1) {
+      response = promoteToLeader(
+        udp_server,
+        state,
+        timeout,
+        term,
+        logs,
+        logsPath
+      );
+      state = response.state;
+      term = response.term;
+      votesFor = 1;
+      votesReceived = 1;
+      clearInterval(heartbeat_timer);
+      heartbeat_timer = setInterval(
+        heartbeat,
+        config.TIME_PERIOD,
+        udp_server,
+        state,
+        timeout,
+        term,
+        logs,
+        logsPath
+      );
+      startElection.stop();
+    }
+  }
+});
 
 // const isMaster = process.env.MASTER;
 
@@ -86,4 +283,12 @@ app.use("/api", postRouter);
 
 app.listen(port, () => console.log(`Server running on ${port}`));
 
-setInterval(heartbeat, 10000, udp_server, state, term, logs, logsPath);
+// setInterval(
+//   heartbeat,
+//   config.TIME_PERIOD,
+//   udp_server,
+//   state,
+//   term,
+//   logs,
+//   logsPath
+// );
