@@ -49,6 +49,24 @@ if (Object.keys(logs).length !== 0) {
   }
 }
 
+initialize_udp_socket = (udp_port) => {
+  udp_socket = dgram.createSocket("udp4");
+
+  udp_server.on("error", (err) => {
+    console.log(`udp server error:\n${err.stack}`);
+    udp_server.close();
+  });
+
+  udp_server.on("listening", () => {
+    // const address = udp_server.address();
+    // console.log(`udp server listening ${address.port}`);
+  });
+
+  udp_server.bind(udp_port);
+
+  return udp_socket;
+};
+
 var state = 0;
 
 var response = {};
@@ -207,6 +225,15 @@ udp_server.on("message", (msg, rinfo) => {
     };
     console.log(res);
   } else if (msg.request === "SHUTDOWN") {
+    if (state === 2) {
+      clearInterval(heartbeat_timer);
+    } else if (state === 1) {
+      startElection.stop();
+    } else if (state === 0) {
+      startElection.stop();
+    } else {
+      console.log("That shouldn't be possible.");
+    }
     try {
       console.log("Closing socket..");
       let res = {
@@ -216,27 +243,19 @@ udp_server.on("message", (msg, rinfo) => {
         if (i != process.env.NODE_ID) {
           try {
             udp_server.send(JSON.stringify(res), 4040, `Node${i}`, () => {
-              num_nodes = num_nodes - 1;
-              if (num_nodes === 0) {
-                udp_server.close();
-                console.log("socket closed!");
-              }
+              udp_server.close();
             });
           } catch (error) {
             console.log(`Node${i} is inactive`);
           }
+          if (i != config.NODES) {
+            udp_server = initialize_udp_socket(udp_port);
+          }
         }
       }
-      if (state === 2) {
-        clearInterval(heartbeat_timer);
-      } else if (state === 1) {
-        startElection.stop();
-      } else if (state === 0) {
-        startElection.stop();
-      } else {
-        console.log("That shouldn't be possible.");
-      }
-      // console.log("socket closed!");
+
+      console.log("socket closed!");
+      startElection.stop();
       // udp_server.close();
     } catch (error) {
       console.log("socket already closed/unavailable");
