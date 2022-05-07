@@ -351,11 +351,11 @@ udp_server.on("message", (msg, rinfo) => {
         value: logs[Object.keys(logs).length - 1].leaderID,
       };
       console.log(res);
-      // try {
-      //   udp_server.send(JSON.stringify(res), 4040, `Controller`);
-      // } catch (error) {
-      //   console.log(`Controller is inactive`);
-      // }
+      try {
+        udp_server.send(JSON.stringify(res), 4040, `Controller`);
+      } catch (error) {
+        console.log(`Controller is inactive`);
+      }
     } else {
       let commited_logs = initialize_logs(entryLogsPath);
       let res = {
