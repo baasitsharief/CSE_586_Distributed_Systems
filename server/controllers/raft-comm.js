@@ -1,5 +1,4 @@
 const fs = require("fs");
-const { markAsUntransferable } = require("worker_threads");
 const config = require("../config");
 
 function Timer(fn, t, ...args) {
@@ -138,6 +137,12 @@ appendEntries = (
     // msg = JSON.parse(msg);
 
     leaderID = msg.leaderID;
+    // lastIndex = -1;
+    // lastTerm = -1;
+    // if(Object.keys(entryLogs).length>0){
+    //   lastIndex = Object.keys(entryLogs).length-1;
+    //   lastTerm = entryLogs[Object.keys(entryLogs).length-1]["Term"];
+    // }
 
     msg.timeout = timeout;
     logs.push(msg);
@@ -160,7 +165,7 @@ appendEntries = (
       request: "APPEND_REPLY", //AppendReply
       term: msg.term,
       key: null,
-      value: true,
+      value: false,
       prevLogIndex: -1, //Object.keys(logs).length,
       prevLogTerm: -1,
       commitIndex: -1,
@@ -170,6 +175,9 @@ appendEntries = (
       res.prevLogTerm = logs[Object.keys(logs).length - 1].prevLogTerm;
       res.commitIndex = Object.keys(entryLogs).length - 1;
       res.entry = logs[Object.keys(logs).length - 1].entry;
+    }
+    if (msg.commitIndex == res.commitIndex) {
+      res.value = true;
     }
     try {
       udp_server.send(JSON.stringify(res), 4040, `Node${leaderID}`);
