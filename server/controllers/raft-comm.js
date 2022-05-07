@@ -43,42 +43,139 @@ initialize_logs = (filePath) => {
   return logs;
 };
 
-heartbeat = (udp_server, node_state, timeout, term, logs, filePath) => {
+heartbeat = (
+  udp_server,
+  node_state,
+  timeout,
+  term,
+  logs,
+  entryLogs,
+  logsPath,
+  entryLogsPath
+) => {
   if (node_state === 2) {
     let msg = {
+      sender_name: `Node${process.env.NODE_ID}`,
       request: 0, //AppendRPC
-      lastIndex: 0, //Object.keys(logs).length,
-      command: "",
       term: term,
+      key: null,
+      value: null,
+      prevLogIndex: -1, //Object.keys(logs).length,
+      prevLogTerm: -1,
+      commitIndex: -1,
+      entry: null,
       leaderID: process.env.NODE_ID,
       heartbeat: config.TIME_PERIOD,
     };
+    if (Object.keys(logs).length > 0) {
+      let lastLog = logs[Object.keys(logs).length - 1];
+      msg.prevLogIndex = lastLog.prevLogIndex;
+      if (Object.keys(entryLogs).length > 0) {
+        msg.prevLogTerm = entryLogs[Object.keys(entryLogs).length - 1]["Term"];
+      }
+      msg.commitIndex = Object.keys(entryLogs).length - 1;
+      msg.entry = lastLog.entry;
+    }
     for (var i = 1; i <= config.NODES; i++) {
       if (i != process.env.NODE_ID) {
         try {
           udp_server.send(JSON.stringify(msg), 4040, `Node${i}`);
         } catch (error) {
-          console.log(error);
+          console.log("heartbeat.error: ", error);
         }
       }
     }
     // console.log(`heartbeat polled, my id: ${process.env.NODE_ID}`);
     msg.timeout = timeout;
+    if (msg.entry !== null) {
+      entryLogs.push(msg.entry);
+      // msg.prevLogIndex = msg.prevLogIndex;
+      msg.prevLogTerm = msg.entry["Term"];
+    }
     logs.push(msg);
-    fs.writeFileSync(filePath, JSON.stringify(logs), { flag: "w+" }, (err) => {
+    fs.writeFileSync(logsPath, JSON.stringify(logs), { flag: "w+" }, (err) => {
       console.log("log save failed.");
     });
+    fs.writeFileSync(
+      entryLogsPath,
+      JSON.stringify(entryLogs),
+      { flag: "w+" },
+      (err) => {
+        console.log("log save failed.");
+      }
+    );
+    if (msg.entry !== null) {
+      msg.commitIndex = msg.commitIndex + 1;
+    }
+    msg = {
+      sender_name: `Node${process.env.NODE_ID}`,
+      request: 0, //AppendRPC
+      term: term,
+      key: null,
+      value: null,
+      prevLogIndex: msg.prevLogIndex, //Object.keys(logs).length,
+      prevLogTerm: msg.prevLogIndex,
+      commitIndex: msg.commitIndex,
+      entry: null,
+      leaderID: process.env.NODE_ID,
+      heartbeat: config.TIME_PERIOD,
+    };
+    logs.push(msg);
   }
 };
 
-appendEntries = (msg, node_state, timeout, logs, logfile) => {
+appendEntries = (
+  udp_server,
+  msg,
+  node_state,
+  timeout,
+  logs,
+  entryLogs,
+  logsPath,
+  entryLogsPath
+) => {
   if (node_state !== 2) {
     // msg = JSON.parse(msg);
+
+    leaderID = msg.leaderID;
+
     msg.timeout = timeout;
     logs.push(msg);
-    fs.writeFileSync(logfile, JSON.stringify(logs), { flag: "w+" }, (err) => {
+    if (msg.entry !== null) {
+      entryLogs.push(msg.entry);
+    }
+    fs.writeFileSync(logsPath, JSON.stringify(logs), { flag: "w+" }, (err) => {
       console.log("log save failed.");
     });
+    fs.writeFileSync(
+      entryLogsPath,
+      JSON.stringify(entryLogs),
+      { flag: "w+" },
+      (err) => {
+        console.log("log save failed.");
+      }
+    );
+    let res = {
+      sender_name: `Node${process.env.NODE_ID}`,
+      request: "APPEND_REPLY", //AppendReply
+      term: msg.term,
+      key: null,
+      value: true,
+      prevLogIndex: -1, //Object.keys(logs).length,
+      prevLogTerm: -1,
+      commitIndex: -1,
+    };
+    if (Object.keys(logs).length > 0) {
+      res.prevLogIndex = logs[Object.keys(logs).length - 1].prevLogIndex;
+      res.prevLogTerm = logs[Object.keys(logs).length - 1].prevLogTerm;
+      res.commitIndex = Object.keys(entryLogs).length - 1;
+      res.entry = logs[Object.keys(logs).length - 1].entry;
+    }
+    try {
+      udp_server.send(JSON.stringify(res), 4040, `Node${leaderID}`);
+    } catch (error) {
+      console.log("appendReply.error: ", error);
+    }
   }
 };
 
@@ -92,7 +189,7 @@ appendEntries = (msg, node_state, timeout, logs, logfile) => {
 requestVote = (udp_server, logs, term) => {
   // console.log(`requesting vote for ${process.env.NODE_ID}`);
   let msg = {
-    lastIndex: 0,
+    prevLogIndex: 0,
   };
   if (Object.keys(logs).length > 0) {
     msg = logs[Object.keys(logs).length - 1];
@@ -105,7 +202,7 @@ requestVote = (udp_server, logs, term) => {
       try {
         udp_server.send(JSON.stringify(msg), 4040, `Node${i}`);
       } catch (error) {
-        console.log(error);
+        console.log("requestVote.error: ", error);
       }
     }
   }
@@ -113,11 +210,11 @@ requestVote = (udp_server, logs, term) => {
 
 sendVote = (udp_server, logs, msg) => {
   let candidateID = msg.candidateID;
-  let lastIndex = msg.lastIndex;
+  let lastIndex = msg.prevLogIndex;
   let lastTerm = msg.term;
   let lastLog = {
     term: 0,
-    lastIndex: 0,
+    prevLogIndex: 0,
   };
   if (Object.keys(logs).length > 0) {
     lastLog = logs[Object.keys(logs).length - 1];
@@ -136,7 +233,7 @@ sendVote = (udp_server, logs, msg) => {
   };
   if (
     parseInt(lastTerm) >= parseInt(lastLog.term) &&
-    parseInt(lastIndex) >= parseInt(lastLog.lastIndex)
+    parseInt(lastIndex) >= parseInt(lastLog.prevLogIndex)
   ) {
     vote_msg.vote = true;
     votedFor = candidateID;
@@ -144,7 +241,7 @@ sendVote = (udp_server, logs, msg) => {
   try {
     udp_server.send(JSON.stringify(vote_msg), 4040, `Node${candidateID}`);
   } catch (error) {
-    console.log(error);
+    console.log("sendVote.error: ", error);
   }
   return { votedFor: votedFor, term: lastTerm };
 };
@@ -169,11 +266,29 @@ demoteToFollower = (node_state, term) => {
   return { state: node_state, term: term };
 };
 
-promoteToLeader = (udp_server, node_state, timeout, term, logs, filePath) => {
+promoteToLeader = (
+  udp_server,
+  node_state,
+  timeout,
+  term,
+  logs,
+  entryLogs,
+  logsPath,
+  entryLogsPath
+) => {
   console.log(`${process.env.NODE_ID} made leader`);
   node_state = 2;
   term = parseInt(term);
-  heartbeat(udp_server, node_state, timeout, term, logs, filePath);
+  heartbeat(
+    udp_server,
+    node_state,
+    timeout,
+    term,
+    logs,
+    entryLogs,
+    logsPath,
+    entryLogsPath
+  );
   return { state: node_state, term: term };
 };
 

@@ -16,6 +16,7 @@ const {
 const config = require("./config");
 
 const logsPath = "../home/node/logs.json";
+const entryLogsPath = "../home/node/entryLogs.json";
 
 const worker = require("worker_threads");
 const dgram = require("dgram");
@@ -28,6 +29,7 @@ const port = 5000;
 const udp_port = 4040;
 
 var logs = initialize_logs(logsPath);
+var entryLogs = initialize_logs(entryLogsPath);
 
 const udp_server = dgram.createSocket("udp4");
 
@@ -71,6 +73,27 @@ var state = 0;
 
 var response = {};
 
+var state_table = {};
+
+initialize_state_table = (logs, entryLogs) => {
+  var table = {};
+  lastLog = {
+    commitIndex: Object.keys(entryLogs).length - 1,
+  };
+  if (Object.keys(logs).length > 0) {
+    commitIndex = logs[Object.keys(logs).length - 1].commitIndex;
+  }
+  for (var i = 1; i <= config.NODES; i++) {
+    if (i != process.env.NODE_ID) {
+      table[`Node${i}`] = {
+        nextIndex: lastLog.commitIndex + 1,
+        matchIndex: -1,
+      };
+    }
+  }
+  return table;
+};
+
 // state = process.env.MASTER === "yes" ? 2 : 0;
 var timeout =
   parseInt(config.TIME_PERIOD) +
@@ -101,7 +124,9 @@ var heartbeat_timer = setInterval(
   timeout,
   term,
   logs,
-  logsPath
+  entryLogs,
+  logsPath,
+  entryLogsPath
 );
 
 udp_server.on("listening", () => {
@@ -132,10 +157,14 @@ udp_server.on("message", (msg, rinfo) => {
         timeout,
         term,
         logs,
-        logsPath
+        entryLogs,
+        logsPath,
+        entryLogsPath
       );
       state = response.state;
       term = response.term;
+      state_table = initialize_state_table(logs, entryLogs);
+      console.log(JSON.stringify(state_table));
       votesFor = 1;
       votesReceived = 1;
       clearInterval(heartbeat_timer);
@@ -147,7 +176,9 @@ udp_server.on("message", (msg, rinfo) => {
         timeout,
         term,
         logs,
-        logsPath
+        entryLogs,
+        logsPath,
+        entryLogsPath
       );
       startElection.stop();
     }
@@ -184,8 +215,18 @@ udp_server.on("message", (msg, rinfo) => {
     votesFor = 1;
     votesReceived = 1;
     clearInterval(heartbeat_timer);
-    appendEntries(msg, state, timeout, logs, logsPath);
+    appendEntries(
+      udp_server,
+      msg,
+      state,
+      timeout,
+      logs,
+      entryLogs,
+      logsPath,
+      entryLogsPath
+    );
     logs = initialize_logs(logsPath);
+    entryLogs = initialize_logs(entryLogsPath);
   } else if (parseInt(msg.request) === 1 && state !== 2) {
     //RequestVote received so send vote if not leader
     let vote = sendVote(udp_server, logs, msg);
@@ -221,7 +262,11 @@ udp_server.on("message", (msg, rinfo) => {
     votesReceived = 1;
   } else if (msg.request === "LEADER_INFO") {
     let res = {
-      LEADER: logs[Object.keys(logs).length - 1].leaderID,
+      sender_name: `Node${process.env.NODE_ID}`,
+      term: null,
+      request: "LEADER_INFO",
+      key: "LEADER",
+      value: logs[Object.keys(logs).length - 1].leaderID,
     };
     console.log(res);
   } else if (msg.request === "SHUTDOWN") {
@@ -270,10 +315,14 @@ udp_server.on("message", (msg, rinfo) => {
         timeout,
         term,
         logs,
-        logsPath
+        entryLogs,
+        logsPath,
+        entryLogsPath
       );
       state = response.state;
       term = response.term;
+      state_table = initialize_state_table(logs, entryLogs);
+      console.log(JSON.stringify(state_table));
       votesFor = 1;
       votesReceived = 1;
       clearInterval(heartbeat_timer);
@@ -285,10 +334,98 @@ udp_server.on("message", (msg, rinfo) => {
         timeout,
         term,
         logs,
-        logsPath
+        entryLogs,
+        logsPath,
+        entryLogsPath
       );
       startElection.stop();
     }
+  } else if (msg.request == "RETRIEVE") {
+    if (state !== 2) {
+      let res = {
+        sender_name: `Node${process.env.NODE_ID}`,
+        term: null,
+        request: "LEADER_INFO",
+        key: "LEADER",
+        value: logs[Object.keys(logs).length - 1].leaderID,
+      };
+      console.log(res);
+      // try {
+      //   udp_server.send(JSON.stringify(res), 4040, `Controller`);
+      // } catch (error) {
+      //   console.log(`Controller is inactive`);
+      // }
+    } else {
+      let commited_logs = initialize_logs(entryLogsPath);
+      let res = {
+        sender_name: `Node${process.env.NODE_ID}`,
+        term: null,
+        request: "RETRIEVE",
+        key: "COMMITED_LOGS",
+        value: commited_logs,
+      };
+      console.log(res);
+      try {
+        udp_server.send(JSON.stringify(res), 4040, `Controller`);
+      } catch (error) {
+        console.log(`Controller is inactive`);
+      }
+    }
+  } else if (msg.request == "STORE") {
+    console.log(`STORE REQUEST: ${JSON.stringify(msg)}`);
+    if (state !== 2) {
+      let res = {
+        sender_name: `Node${process.env.NODE_ID}`,
+        term: null,
+        request: "LEADER_INFO",
+        key: "LEADER",
+        value: logs[Object.keys(logs).length - 1].leaderID,
+      };
+      console.log(res);
+      try {
+        udp_server.send(JSON.stringify(res), 4040, `Controller`);
+      } catch (error) {
+        console.log(`Controller is inactive`);
+      }
+    } else {
+      let res = {
+        sender_name: `Node${process.env.NODE_ID}`,
+        request: 0, //AppendRPC
+        term: term,
+        key: null,
+        value: null,
+        prevLogIndex: -1, //Object.keys(logs).length,
+        prevLogTerm: -1,
+        commitIndex: -1,
+        entry: null,
+        leaderID: process.env.NODE_ID,
+        heartbeat: config.TIME_PERIOD,
+      };
+      if (Object.keys(logs).length > 0) {
+        res.prevLogIndex = logs[Object.keys(logs).length - 1].prevLogIndex + 1;
+        res.prevLogTerm = logs[Object.keys(logs).length - 1].prevLogTerm;
+        res.commitIndex = logs[Object.keys(logs).length - 1].commitIndex;
+        if (Object.keys(entryLogs).length > 0 && res.commitIndex !== -1) {
+          res.prevLogTerm = entryLogs[res.commitIndex].Term;
+        }
+      }
+      res.entry = { Term: term, Key: msg.key, Value: msg.value };
+      res.timeout = timeout;
+      logs.push(res);
+    }
+  } else if (msg.request == "APPEND_REPLY") {
+    // console.log(`APPEND_REPLY: ${JSON.stringify(msg)}`);
+    if (state == 2) {
+      var nextIndex = state_table[msg.sender_name].nextIndex;
+      if (nextIndex < msg.commitIndex + 1) {
+        nextIndex = msg.commitIndex + 1;
+      }
+      state_table[msg.sender_name] = {
+        nextIndex: nextIndex,
+        matchIndex: msg.commitIndex,
+      };
+    }
+    // console.log(`state table: ${JSON.stringify(state_table)}`);
   }
 });
 

@@ -1,4 +1,4 @@
-const TIME_PERIOD = 150; //in ms
+const TIME_PERIOD = 1000; //in ms
 const NODES = 5;
 const FOLLOWER = 0; //Follower
 const CANDIDATE = 1; //Candidate
